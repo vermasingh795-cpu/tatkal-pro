@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -100,6 +101,8 @@ class _HomePageState extends State<HomePage> {
   bool _checkingNetwork = false;
   String _networkDetail = 'Please wait';
   String _pnrMessage = 'Enter a PNR to open the official enquiry page.';
+  String _travelClass = '3A';
+  String _quota = 'Tatkal';
 
   static const _irctcSearch = 'https://www.irctc.co.in/nget/train-search';
   static const _pnrUrl = 'https://www.indianrail.gov.in/enquiry/PNR/PnrEnquiry.html?locale=en';
@@ -174,6 +177,25 @@ class _HomePageState extends State<HomePage> {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open the link.')),
+      );
+    }
+  }
+
+  Future<void> _copyJourneyDetails() async {
+    final details = [
+      'From: ${_from.text.trim()}',
+      'To: ${_to.text.trim()}',
+      'Journey date: ${_date.text.trim()}',
+      'Class: $_travelClass',
+      'Quota: $_quota',
+      'Passengers saved in Tatkal Pro: ${_passengers.length}',
+      '',
+      'Please verify all details on the official IRCTC website before booking.'
+    ].join('\\n');
+    await Clipboard.setData(ClipboardData(text: details));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Journey details copied. Paste/check them on IRCTC.')),
       );
     }
   }
@@ -317,13 +339,48 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 12),
           _section('Journey details', Icons.train, Column(children: [
-            TextField(controller: _from, decoration: const InputDecoration(labelText: 'From station')),
-            TextField(controller: _to, decoration: const InputDecoration(labelText: 'To station')),
+            TextField(controller: _from, textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(labelText: 'From station / code')),
+            TextField(controller: _to, textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(labelText: 'To station / code')),
             TextField(controller: _date, decoration: const InputDecoration(labelText: 'Journey date (DD-MM-YYYY)')),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _travelClass,
+              decoration: const InputDecoration(labelText: 'Travel class'),
+              items: const [
+                DropdownMenuItem(value: '1A', child: Text('1A – First AC')),
+                DropdownMenuItem(value: '2A', child: Text('2A – Second AC')),
+                DropdownMenuItem(value: '3A', child: Text('3A – Third AC')),
+                DropdownMenuItem(value: 'SL', child: Text('SL – Sleeper')),
+                DropdownMenuItem(value: 'CC', child: Text('CC – Chair Car')),
+              ],
+              onChanged: (v) => setState(() => _travelClass = v ?? '3A'),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _quota,
+              decoration: const InputDecoration(labelText: 'Quota'),
+              items: const [
+                DropdownMenuItem(value: 'Tatkal', child: Text('Tatkal')),
+                DropdownMenuItem(value: 'General', child: Text('General')),
+                DropdownMenuItem(value: 'Premium Tatkal', child: Text('Premium Tatkal')),
+              ],
+              onChanged: (v) => setState(() => _quota = v ?? 'Tatkal'),
+            ),
             const SizedBox(height: 12),
+            SizedBox(width: double.infinity, child: OutlinedButton.icon(
+              onPressed: _copyJourneyDetails,
+              icon: const Icon(Icons.copy), label: const Text('Copy journey details'))),
+            const SizedBox(height: 8),
             SizedBox(width: double.infinity, child: FilledButton.icon(
               onPressed: () => _openUrl(_irctcSearch),
-              icon: const Icon(Icons.open_in_new), label: const Text('Open IRCTC train search'))),
+              icon: const Icon(Icons.open_in_new), label: const Text('Open official IRCTC search'))),
+            const SizedBox(height: 6),
+            const Text(
+              'Tatkal Pro prepares and copies your search details. For safety, it does not auto-fill IRCTC forms or automate booking. Confirm station codes, train origin date and availability on IRCTC.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
           ])),
           _section('Saved passengers', Icons.people, Column(
             crossAxisAlignment: CrossAxisAlignment.start,
