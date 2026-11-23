@@ -457,3 +457,154 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  static const _pinKey = 'tatkal_pro_local_pin';
+  final _storage = const FlutterSecureStorage();
+  final _pin = TextEditingController();
+  final _confirmPin = TextEditingController();
+
+  bool _loading = true;
+  bool _setupMode = false;
+  String _message = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPin();
+  }
+
+  Future<void> _checkPin() async {
+    final saved = await _storage.read(key: _pinKey);
+    if (!mounted) return;
+    setState(() {
+      _setupMode = saved == null;
+      _loading = false;
+      _message = saved == null
+          ? 'Create your 4-digit PIN'
+          : 'Enter your PIN to continue';
+    });
+  }
+
+  Future<void> _submit() async {
+    final pin = _pin.text.trim();
+
+    if (!RegExp(r'^\d{4}$').hasMatch(pin)) {
+      setState(() => _message = 'PIN must be exactly 4 digits.');
+      return;
+    }
+
+    if (_setupMode) {
+      if (_confirmPin.text.trim() != pin) {
+        setState(() => _message = 'PINs do not match. Try again.');
+        return;
+      }
+      await _storage.write(key: _pinKey, value: pin);
+      if (!mounted) return;
+      setState(() {
+        _setupMode = false;
+        _pin.clear();
+        _confirmPin.clear();
+        _message = 'PIN created. Enter it to continue.';
+      });
+      return;
+    }
+
+    final saved = await _storage.read(key: _pinKey);
+    if (pin == saved) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } else {
+      setState(() => _message = 'Incorrect PIN. Please try again.');
+      _pin.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _confirmPin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F9),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.train, size: 55,
+                      color: Color(0xFF172B43)),
+                  const SizedBox(height: 12),
+                  const Text('TATKAL PRO',
+                      style: TextStyle(
+                          fontSize: 25, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(_message, textAlign: TextAlign.center),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _pin,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    decoration: const InputDecoration(
+                      labelText: '4-digit PIN',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (_setupMode)
+                    TextField(
+                      controller: _confirmPin,
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm PIN',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _submit,
+                      child: Text(_setupMode ? 'Create PIN' : 'Login'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Your PIN is stored securely on this device.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
